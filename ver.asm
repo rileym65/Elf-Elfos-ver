@@ -9,6 +9,14 @@
 include    bios.inc
 include    kernel.inc
 
+.op "PUSH","N","9$1 73 8$1 73"
+.op "POP","N","60 72 A$1 F0 B$1"
+.op "CALL","W","D4 H1 L1"
+.op "RTN","","D5"
+.op "MOV","NR","9$1 B$2 8$1 A$2"
+.op "MOV","NW","f8 H2 B$1 f8 L2 a$1"
+
+#ifdef PACKAGE
            org     8000h
            lbr     0ff00h
            db      'ver',0
@@ -18,15 +26,14 @@ include    kernel.inc
            dw      endrom-2000h
            dw      2000h
            db      0
+#endif
 
            org     2000h
-           br      start               ; jump past version info
-
-include    date.inc
-include    build.inc
+start:     br      begin               ; jump past version info
+           eever
            db      'Written by Michael H. Riley',0
 
-start:     ldn     ra                  ; get byte from passed args
+begin:     ldn     ra                  ; get byte from passed args
            bnz     filever             ; jump for file version
            ldi     high buffer         ; point to buffer
            phi     rf
@@ -40,8 +47,7 @@ start:     ldn     ra                  ; get byte from passed args
            plo     rd                  ; prepare for conversion
            ldi     0                   ; high byte is zero
            phi     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
            ldi     '.'                 ; put a dot into the buffer
            str     rf
            inc     rf
@@ -49,8 +55,7 @@ start:     ldn     ra                  ; get byte from passed args
            plo     rd                  ; prepare for conversion
            ldi     0                   ; high byte is zero
            phi     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
            ldi     '.'                 ; put a dot into the buffer
            str     rf
            inc     rf
@@ -58,52 +63,55 @@ start:     ldn     ra                  ; get byte from passed args
            plo     rd                  ; prepare for conversion
            ldi     0                   ; high byte is zero
            phi     rd
-           sep     scall               ; convert number
-           dw      donum
-           ldi     ' '                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     'B'                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     'u'                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     'i'                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     'l'                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     'd'                 ; put a dot into the buffer
-           str     rf
-           inc     rf
-           ldi     ' '                 ; put a dot into the buffer
-           str     rf
-           inc     rf
+           call    donum
+           call    incopy
+           db      ' Build ',0
+;           ldi     ' '                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     'B'                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     'u'                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     'i'                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     'l'                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     'd'                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
+;           ldi     ' '                 ; put a dot into the buffer
+;           str     rf
+;           inc     rf
            lda     rb                  ; get it
            phi     rd
            lda     rb
            plo     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
            ldi     ' '                 ; put a dot into the buffer
            str     rf
            inc     rf
-           sep     scall               ; display date
-           dw      dodate
-           sep     scall               ; display cr/lf
-           dw      f_inmsg
+           call    dodate
+           call    o_inmsg
            db      10,13,0
-           sep     sret                ; and return to caller
+retrn:     rtn
+
+incopy:    lda     r6                  ; get next byte
+           lbz     retrn               ; jump if done
+           str     rf                  ; store it
+           inc     rf                  ; next position
+           lbr     incopy              ; loop until done
 
 dodate:    lda     rb                  ; get month
-           ani     07fh                ; strip high bit
+           ani     00fh                ; strip high bits
            plo     rd                  ; prepare for conversion
            ldi     0                   ; high byte is zero
            phi     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
            ldi     '/'                 ; put a dot into the buffer
            str     rf
            inc     rf
@@ -111,8 +119,7 @@ dodate:    lda     rb                  ; get month
            plo     rd                  ; prepare for conversion
            ldi     0                   ; high byte is zero
            phi     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
            ldi     '/'                 ; put a dot into the buffer
            str     rf
            inc     rf
@@ -120,8 +127,7 @@ dodate:    lda     rb                  ; get month
            phi     rd                  ; prepare for conversion
            lda     rb
            plo     rd
-           sep     scall               ; convert number
-           dw      donum
+           call    donum
 
            ldi     0
            str     rf
@@ -130,19 +136,52 @@ dodate:    lda     rb                  ; get month
            phi     rf
            ldi     low buffer
            plo     rf
-           sep     scall               ; display version
-           dw      o_msg
-           sep     sret                ; and return to caller
+           call    o_msg
+           rtn
+
+dotime:    ldi     ' '                 ; put space into output
+           str     rf
+           inc     rf
+           lda     rb                  ; get month
+           plo     rd                  ; prepare for conversion
+           ldi     0                   ; high byte is zero
+           phi     rd
+           call    donum
+           ldi     ':'                 ; put a dot into the buffer
+           str     rf
+           inc     rf
+           lda     rb                  ; get day
+           plo     rd                  ; prepare for conversion
+           ldi     0                   ; high byte is zero
+           phi     rd
+           call    donum
+           ldi     ':'                 ; put a dot into the buffer
+           str     rf
+           inc     rf
+           lda     rb                  ; get year
+           phi     rd                  ; prepare for conversion
+           ldi     0
+           plo     rd
+           call    donum
+
+           ldi     0
+           str     rf
+           inc     rf
+           ldi     high buffer         ; point to buffer
+           phi     rf
+           ldi     low buffer
+           plo     rf
+           call    o_msg
+           rtn
 
 donum:     glo     rd                  ; check for zero
            bnz     nonzero             ; jump if not zero
            ldi     '0'                 ; store zero into buffer
            str     rf
            inc     rf
-           sep     sret                ; and return
-nonzero:   sep     scall               ; convert number
-           dw      f_intout
-           sep     sret                ; and return to caller
+           rtn
+nonzero:   call    f_intout
+           rtn
 
 filever:   ghi     ra                  ; transfer args to rf
            phi     rf
@@ -160,16 +199,15 @@ loop1:     lda     ra                  ; find end of filename
            plo     rd
            ldi     0                   ; flags for open
            plo     r7
-           sep     scall               ; attempt to open file
-           dw      o_open
+           call    o_open
            lbnf     opened             ; jump if file was opened
            ldi     high errmsg         ; get error message
            phi     rf
            ldi     low errmsg
            plo     rf
-           sep     scall               ; display it
-           dw      o_msg
-           lbr     o_wrmboot           ; and return to os
+           call    o_msg
+           ldi     0ch
+           rtn
 opened:    ldi     high buffer2        ; set up for read
            phi     rf
            ldi     low buffer2
@@ -178,8 +216,7 @@ opened:    ldi     high buffer2        ; set up for read
            phi     rc
            ldi     8
            plo     rc
-           sep     scall               ; read them
-           dw      o_read
+           call    o_read
            ldi     high buffer2        ; set up for read
            phi     rf
            ldi     low buffer2
@@ -188,8 +225,7 @@ opened:    ldi     high buffer2        ; set up for read
            phi     rc
            ldi     4
            plo     rc
-           sep     scall               ; read them
-           dw      o_read
+           call    o_read
            ldi     high buffer2        ; set up for display
            phi     rb
            ldi     low buffer2
@@ -198,28 +234,37 @@ opened:    ldi     high buffer2        ; set up for read
            phi     rf
            ldi     low buffer
            plo     rf
-           sep     scall                ; display the date
-           dw      dodate
+           call    dodate
            mov     rf,buffer2           ; point to buffer
            ldn     rf                   ; retrieve month
+           stxd                         ; need to keep this for later
+           ani     040h                 ; is bit 6 set
+           lbz     notime               ; jump if no time present
+           mov     rf,buffer2           ; need to read build time
+           mov     rd,fildes
+           mov     rc,3
+           call    o_read
+           mov     rf,buffer            ; point to output bufer
+           mov     rb,buffer2           ; point to read bytes
+           call    dotime               ; display time
+notime:    irx                          ; recover month byte
+           ldx
+           dec     r2                   ; keep on stack
            shl                          ; shift high bit to DF
-           lbnf    return               ; done if not extended block
-           sep     scall                ; need to display build number
-           dw      f_inmsg
+           lbnf    nobuild              ; done if not extended block
+           call    o_inmsg
            db      ' Build: ',0
            mov     rf,buffer2           ; need to read build number
            mov     rd,fildes
            mov     rc,2
-           sep     scall
-           dw      o_read
+           call    o_read
            mov     rf,buffer2           ; point to read bytes
            lda     rf                   ; get the number
            phi     rd
            lda     rf
            plo     rd
            mov     rf,buffer2           ; where to put conversion
-           sep     scall                ; convert number
-           dw      f_uintout
+           call    f_uintout
            ldi     ' '                  ; add a space
            str     rf
            inc     rf
@@ -228,13 +273,15 @@ opened:    ldi     high buffer2        ; set up for read
            ldi     0                    ; and terminator
            str     rf
            mov     rf,buffer2           ; now display build number
-           sep     scall
-           dw      f_msg
+           call    o_msg
+nobuild:   irx                          ; recover flags byte
+           ldx
+           ori     0c0h                 ; see if comment is presnet
+           lbz     return               ; jump if not
 comment:   mov     rf,buffer2           ; point to buffer
            mov     rd,fildes            ; point to fildes
            mov     rc,1                 ; read 1 byte
-           sep     scall
-           dw      o_read
+           call    o_read
            lbdf    return               ; end if error
            glo     rc                   ; get read count
            smi     1                    ; check for 1 byte read
@@ -242,17 +289,14 @@ comment:   mov     rf,buffer2           ; point to buffer
            mov     rf,buffer2           ; point back to read byte
            ldn     rf                   ; get it
            lbz     return               ; done if terminator
-           sep     scall                ; otherwise display it
-           dw      f_type
+           call    o_type
            lbr     comment              ; loop to read rest of comment 
-return:    sep     scall                ; display cr/lf
-           dw      f_inmsg
+return:    call    o_inmsg
            db      10,13,0
            mov     rd,fildes            ; close the file
-           sep     scall
-           dw      o_close
-           lbr     o_wrmboot            ; return to OS
-
+           call    o_close
+           ldi     0
+           rtn
 
 errmsg:    db      'File not found',10,13,0
 
@@ -265,9 +309,12 @@ fildes:    db      0,0,0,0
            db      0,0,0,0
 
 endrom:    equ     $
+.suppress
 
 dta:       ds      512
 
 buffer2:   ds      8
 
 buffer:    db      0
+
+           end     start
