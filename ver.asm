@@ -159,9 +159,9 @@ dotime:    ldi     ' '                 ; put space into output
            str     rf
            inc     rf
            lda     rb                  ; get year
-           phi     rd                  ; prepare for conversion
+           plo     rd                  ; prepare for conversion
            ldi     0
-           plo     rd
+           phi     rd
            call    donum
 
            ldi     0
